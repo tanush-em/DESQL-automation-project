@@ -1,32 +1,28 @@
-import argparse
-from extract_info import SpecificFormParser
+import sys
 import os
+from extract_info import SpecificFormParser
 
-
-def main():
-    parser = argparse.ArgumentParser(description="Extract info from form images using SpecificFormParser.")
-    parser.add_argument('--image', type=str, default="../data/demo.jpeg", help="Path to the image file to process (default: ../data/demo.jpeg)")
-    parser.add_argument('--batch', nargs='+', help="List of image files to process in batch mode.")
-    parser.add_argument('--output', type=str, default="extracted_form_data.csv", help="Output CSV file for batch mode.")
-    parser.add_argument('--preview', action='store_true', help="Preview extraction for a single image (default mode).")
-    args = parser.parse_args()
-
-    form_parser = SpecificFormParser()
-
-    if args.batch:
-        print(f"Batch processing {len(args.batch)} images...")
-        df = form_parser.batch_process(args.batch, args.output)
-        print(f"Processed {len(df)} documents. Output saved to {args.output}")
-    else:
-        image_path = args.image
-        if not os.path.exists(image_path):
-            print(f"Image file not found: {image_path}")
-            return
-        print(f"Previewing extraction for: {image_path}")
-        form_parser.preview_extraction(image_path)
-        print("\nAvailable columns:")
-        for i, col in enumerate(form_parser.columns, 1):
-            print(f"{i:2d}. {col}")
+def print_usage():
+    print("Usage: python run.py <image_path> <output_csv> [fields_config.json]")
+    print("  <image_path>: Path to the image to process")
+    print("  <output_csv>: Path to save the extracted CSV")
+    print("  [fields_config.json]: (Optional) Path to field names config file (default: fields_config.json)")
 
 if __name__ == "__main__":
-    main() 
+    if len(sys.argv) < 3:
+        print_usage()
+        sys.exit(1)
+    image_path = sys.argv[1]
+    output_csv = sys.argv[2]
+    config_path = sys.argv[3] if len(sys.argv) > 3 else "../fields_config.json"
+
+    if not os.path.exists(image_path):
+        print(f"Image file not found: {image_path}")
+        sys.exit(1)
+    if not os.path.exists(config_path):
+        print(f"Config file not found: {config_path}")
+        sys.exit(1)
+
+    parser = SpecificFormParser(config_path=config_path)
+    parser.process_image_to_csv(image_path, output_csv)
+    print(f"Done. Extracted data saved to {output_csv}") 

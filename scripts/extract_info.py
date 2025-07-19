@@ -5,6 +5,7 @@ import re
 import numpy as np
 from typing import Dict, List
 import logging
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -15,17 +16,10 @@ class SpecificFormParser:
     Specialized parser for your specific form documents
     """
     
-    def __init__(self):
-        # Exact column names from your form template
-        self.columns = [
-            'File No', 'Form No', 'Title', 'First Name', 'Last Name', 'Initial',
-            'Email', 'Father name', 'DOB', 'Gender', 'Profession', 
-            'Mailing street', 'Mailing city', 'Mailing postal code', 'Mailing country',
-            'Service provider', 'Reference number', 'Sim no', 'Type of network',
-            'Cell model number', 'IMMEI-1', 'IMMEI-2', 'Type of plan', 
-            'Credit card type', 'Contact value', 'Date of issue', 'Date of renewal',
-            'Installments', 'Amount in words', 'Remarks'
-        ]
+    def __init__(self, config_path='fields_config.json'):
+        # Load column names from config file
+        with open(config_path, 'r') as f:
+            self.columns = json.load(f)
         
         # Regex patterns for specific data types
         self.patterns = {
@@ -165,6 +159,52 @@ class SpecificFormParser:
                 break
         
         return parsed_data
+    
+    def extract_multiple_entries(self, raw_text: str) -> list:
+        """
+        Extract multiple sets of form data from OCR output.
+        Returns a list of dicts, each mapping field names to values.
+        """
+        # Heuristic: split entries by lines starting with a title or email
+        entry_starts = []
+        lines = raw_text.split('\n')
+        for idx, line in enumerate(lines):
+            if re.match(r'^(Ms\.|Mr\.|MR|Mrs\.|Dr\.|[A-Za-z]+\s+[A-Za-z]+\s+@)', line.strip()):
+                entry_starts.append(idx)
+            elif re.match(self.patterns['email'], line.strip()):
+                entry_starts.append(idx)
+        # Ensure unique and sorted
+        entry_starts = sorted(set(entry_starts))
+        if not entry_starts:
+            # fallback: treat whole text as one entry
+            entry_starts = [0]
+        entry_starts.append(len(lines))  # sentinel for last entry
+
+        entries = []
+        for i in range(len(entry_starts) - 1):
+            entry_lines = lines[entry_starts[i]:entry_starts[i+1]]
+            entry_text = ' '.join([l.strip() for l in entry_lines if l.strip()])
+            # Simple split: try to split by whitespace for each field
+            values = re.split(r'\s{2,}|\t|\s\|\s', entry_text)
+            # Fallback: split by single space if not enough fields
+            if len(values) < len(self.columns):
+                values = entry_text.split()
+            # Pad or trim to match columns
+            values = (values + [''] * len(self.columns))[:len(self.columns)]
+            entry = {col: val for col, val in zip(self.columns, values)}
+            entries.append(entry)
+        return entries
+
+    def process_image_to_csv(self, image_path: str, output_csv: str):
+        """
+        Process a single image with potentially multiple entries and write to CSV.
+        """
+        logger.info(f"Processing image: {image_path}")
+        raw_text = self.extract_raw_text(image_path)
+        entries = self.extract_multiple_entries(raw_text)
+        df = pd.DataFrame(entries)
+        df.to_csv(output_csv, index=False)
+        logger.info(f"Extracted {len(entries)} entries and saved to {output_csv}")
     
     def process_single_document(self, image_path: str) -> Dict[str, str]:
         """
