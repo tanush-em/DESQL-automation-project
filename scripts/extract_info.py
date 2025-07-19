@@ -75,7 +75,7 @@ class SpecificFormParser:
         processed = self.remove_watermark_effects(img)
         
         # OCR configuration optimized for forms
-        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@.-_/\(\)\s'
+        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@.-_/\\(\\)\\s'
         
         # Extract text
         raw_text = pytesseract.image_to_string(processed, config=custom_config)
@@ -234,22 +234,3 @@ class SpecificFormParser:
         for key, value in parsed_data.items():
             if value:  # Only show non-empty fields
                 print(f"{key}: {value}")
-
-# Usage example
-def main():
-    parser = SpecificFormParser()
-    
-    # For single document preview (useful for testing)
-    # parser.preview_extraction('path/to/your/document.jpg')
-    
-    # For batch processing
-    # image_paths = ['doc1.jpg', 'doc2.jpg', 'doc3.jpg']  # List your image files
-    # df = parser.batch_process(image_paths, 'extracted_form_data.csv')
-    # print(f"Processed {len(df)} documents")
-    
-    print("Available columns:")
-    for i, col in enumerate(parser.columns, 1):
-        print(f"{i:2d}. {col}")
-
-if __name__ == "__main__":
-    main()
